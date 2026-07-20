@@ -1,49 +1,67 @@
 #!/bin/sh
 
-set -e
-set -x
+set -eu
 
-echo "Starting Zidash Xcode Cloud setup"
+echo "===== Zidash Xcode Cloud setup started ====="
+echo "Current directory: $(pwd)"
+echo "Repository path: ${CI_PRIMARY_REPOSITORY_PATH:-not-set}"
+echo "Home: $HOME"
 
-cd "$CI_PRIMARY_REPOSITORY_PATH"
+REPO_PATH="${CI_PRIMARY_REPOSITORY_PATH:-$(cd "$(dirname "$0")/../.." && pwd)}"
 
-# Install Flutter if it is not already available.
-if ! command -v flutter >/dev/null 2>&1; then
+echo "Using repository path: $REPO_PATH"
+cd "$REPO_PATH"
+
+echo "Repository contents:"
+ls -la
+
+FLUTTER_DIR="$HOME/flutter"
+
+if [ ! -x "$FLUTTER_DIR/bin/flutter" ]; then
+  echo "Installing Flutter stable..."
+  rm -rf "$FLUTTER_DIR"
+
   git clone \
     --depth 1 \
     --branch stable \
     https://github.com/flutter/flutter.git \
-    "$HOME/flutter"
-
-  export PATH="$HOME/flutter/bin:$PATH"
+    "$FLUTTER_DIR"
 fi
+
+export PATH="$FLUTTER_DIR/bin:$PATH"
+
+echo "Flutter path:"
+command -v flutter
 
 echo "Flutter version:"
 flutter --version
 
-# Generate Flutter plugin metadata and iOS artifacts.
+echo "Disabling Flutter analytics..."
 flutter config --no-analytics
+
+echo "Downloading iOS artifacts..."
 flutter precache --ios
+
+echo "Installing Dart dependencies..."
 flutter pub get
 
-# Ensure generated iOS configuration exists.
+echo "Generating iOS configuration..."
 flutter build ios --config-only --release --no-codesign
 
-cd ios
+echo "Entering iOS directory..."
+cd "$REPO_PATH/ios"
 
-# Remove stale pod integration from the repository clone.
+echo "CocoaPods version:"
+pod --version
+
+echo "Cleaning generated pod links..."
 rm -rf Pods
 rm -rf .symlinks
 
-# Install CocoaPods if unavailable.
-if ! command -v pod >/dev/null 2>&1; then
-  HOMEBREW_NO_AUTO_UPDATE=1 brew install cocoapods
-fi
+echo "Installing CocoaPods dependencies..."
+pod install --repo-update
 
-pod repo update
-pod install
-
-echo "Installed geocoding pods:"
+echo "Checking geocoding installation..."
 grep -i "geocoding" Podfile.lock || true
 
-echo "Zidash Xcode Cloud setup complete"
+echo "===== Zidash Xcode Cloud setup completed ====="
