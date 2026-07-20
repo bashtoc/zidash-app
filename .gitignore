@@ -46,3 +46,6 @@ app.*.map.json
 
 # Xcode generated files
 **/DerivedData/
+
+# Xcode generated build data
+**/DerivedData/
