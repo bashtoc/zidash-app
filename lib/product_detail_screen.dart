@@ -292,17 +292,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 const SizedBox(height: 28),
                 _sellerCard(listing),
                 const SizedBox(height: 32),
-                const Text(
-                  'Similar Listings',
-                  style: TextStyle(
-                    color: _ink,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 14),
                 _similarListings(listing['id']?.toString()),
-                const SizedBox(height: 32),
                 _safetySection(),
                 const SizedBox(height: 24),
               ],
@@ -538,23 +528,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 18),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () {},
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF008C2E),
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(56),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              textStyle: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-            child: const Text('Got it, I understand'),
-          ),
-        ),
       ],
     );
   }
@@ -693,41 +666,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _similarListings(String? currentId) {
     final future = _similarFuture;
-    if (future == null) {
-      return const Text(
-        'No similar listings yet.',
-        style: TextStyle(color: _muted, fontWeight: FontWeight.w600),
-      );
-    }
-    return SizedBox(
-      height: 210,
-      child: FutureBuilder<List<dynamic>>(
-        future: future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(
+    if (future == null) return const SizedBox.shrink();
+    return FutureBuilder<List<dynamic>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _SimilarListingsShell(
+            child: Center(
               child: CircularProgressIndicator(color: _primaryColor),
-            );
-          }
-          final listings = (snapshot.data ?? [])
-              .whereType<Map>()
-              .map((item) => item.cast<String, dynamic>())
-              .where((item) => item['id']?.toString() != currentId)
-              .take(8)
-              .toList();
-          if (listings.isEmpty) {
-            return const Text(
-              'No similar listings yet.',
-              style: TextStyle(color: _muted, fontWeight: FontWeight.w600),
-            );
-          }
-          return ListView.builder(
+            ),
+          );
+        }
+        if (snapshot.hasError) return const SizedBox.shrink();
+        final listings = (snapshot.data ?? [])
+            .whereType<Map>()
+            .map((item) => item.cast<String, dynamic>())
+            .where((item) => item['id']?.toString() != currentId)
+            .take(8)
+            .toList();
+        if (listings.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return _SimilarListingsShell(
+          child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: listings.length,
             itemBuilder: (context, index) => _similarCard(listings[index]),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -904,7 +871,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final phone = _sellerPhone(listing);
     final digits = phone?.replaceAll(RegExp(r'\D'), '');
     if (digits == null || digits.isEmpty) {
-      _showContactUnavailable('WhatsApp number is not available.');
+      _showContactUnavailable(
+        'This seller has not added a WhatsApp number yet. You can send them a message through Zidash instead.',
+        title: 'WhatsApp unavailable',
+        icon: Icons.phone_in_talk_outlined,
+      );
       return;
     }
     final title = listing['title']?.toString() ?? 'your listing';
@@ -924,7 +895,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (!allowed) return;
     final phone = _sellerPhone(listing);
     if (phone == null || phone.trim().isEmpty) {
-      _showContactUnavailable('Seller phone number is not available.');
+      _showContactUnavailable(
+        'This seller has not added a phone number yet. You can send them a message through Zidash instead.',
+        title: 'Phone number unavailable',
+        icon: Icons.phone_disabled_rounded,
+      );
       return;
     }
     await _launchContactUri(
@@ -934,12 +909,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _contactSupport() async {
-    final uri = Uri(
-      scheme: 'mailto',
-      path: 'support@zidash.com',
-      queryParameters: {'subject': 'Zidash marketplace safety support'},
+    _showContactUnavailable(
+      'Send us an email at support@zidash.com and our support team will get back to you as soon as possible.',
+      title: 'Contact Zidash Support',
+      icon: Icons.support_agent_rounded,
     );
-    await _launchContactUri(uri, 'Could not open email support.');
   }
 
   Future<void> _togglePreferred(Map<String, dynamic> listing) async {
@@ -998,11 +972,80 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (!didLaunch) _showContactUnavailable(fallbackMessage);
   }
 
-  void _showContactUnavailable(String message) {
+  void _showContactUnavailable(
+    String message, {
+    String title = 'Unavailable right now',
+    IconData icon = Icons.info_outline_rounded,
+  }) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 380),
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 30,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  color: _muted,
+                ),
+              ),
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: _primaryColor.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: _primaryColor, size: 38),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 21,
+                  height: 1.2,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _muted,
+                  fontSize: 14,
+                  height: 1.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _shareListing(Map<String, dynamic> listing) {
@@ -1069,6 +1112,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final parts = name.split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
     final initials = parts.take(2).map((part) => part[0].toUpperCase()).join();
     return initials.isEmpty ? 'ZS' : initials;
+  }
+}
+
+class _SimilarListingsShell extends StatelessWidget {
+  const _SimilarListingsShell({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Similar Listings',
+          style: TextStyle(
+            color: _ink,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(height: 210, child: child),
+        const SizedBox(height: 32),
+      ],
+    );
   }
 }
 

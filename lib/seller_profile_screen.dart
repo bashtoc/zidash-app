@@ -163,35 +163,62 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
 
   Widget _errorState(String message) {
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      child: SizedBox.expand(
+        child: Stack(
           children: [
-            const Icon(Icons.storefront_outlined, size: 48, color: _muted),
-            const SizedBox(height: 14),
-            const Text(
-              'Seller profile unavailable',
-              style: TextStyle(
-                color: _ink,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
+            Positioned(
+              top: 8,
+              left: 12,
+              child: IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: _muted,
-                fontWeight: FontWeight.w600,
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.storefront_outlined,
+                        size: 56,
+                        color: _muted,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Seller profile unavailable',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _ink,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: _muted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      FilledButton(
+                        onPressed: _refresh,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _primaryColor,
+                        ),
+                        child: const Text('Try again'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: _refresh,
-              style: FilledButton.styleFrom(backgroundColor: _primaryColor),
-              child: const Text('Try again'),
             ),
           ],
         ),

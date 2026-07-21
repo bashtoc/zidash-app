@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'services/api_service.dart';
 
@@ -57,7 +58,8 @@ const _plans = [
     price: 9000,
     tag: 'Power Seller',
     icon: Icons.workspace_premium_outlined,
-    description: 'Dominate search for a full month. Perfect for high-value items.',
+    description:
+        'Dominate search for a full month. Perfect for high-value items.',
   ),
 ];
 
@@ -91,9 +93,11 @@ class _BoostListing {
         ? (images.first as Map).cast<String, dynamic>()
         : null;
     final category =
-        (json['category'] as Map?)?.cast<String, dynamic>()['name']?.toString() ??
-            json['categoryName']?.toString() ??
-            '';
+        (json['category'] as Map?)
+            ?.cast<String, dynamic>()['name']
+            ?.toString() ??
+        json['categoryName']?.toString() ??
+        '';
     final promoted = DateTime.tryParse(json['promotedUntil']?.toString() ?? '');
     return _BoostListing(
       id: json['id']?.toString() ?? '',
@@ -121,8 +125,10 @@ class _BoostScreenState extends State<BoostScreen>
   _BoostListing? _selectedListing;
   _BoostPlan? _selectedPlan;
   bool _isProcessing = false;
+  String _paymentMethod = 'wallet';
 
   late Future<List<_BoostListing>> _listingsFuture;
+  late Future<num> _walletBalanceFuture;
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
 
@@ -130,6 +136,7 @@ class _BoostScreenState extends State<BoostScreen>
   void initState() {
     super.initState();
     _listingsFuture = _loadListings();
+    _walletBalanceFuture = _loadWalletBalance();
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
@@ -151,8 +158,17 @@ class _BoostScreenState extends State<BoostScreen>
     ]);
     final all = [...results[0], ...results[1]];
     return all
-        .map((item) => _BoostListing.fromJson((item as Map).cast<String, dynamic>()))
+        .map(
+          (item) =>
+              _BoostListing.fromJson((item as Map).cast<String, dynamic>()),
+        )
         .toList();
+  }
+
+  Future<num> _loadWalletBalance() async {
+    final data = await ApiService.instance.bootstrap();
+    final wallet = (data['walletBalance'] as Map?)?.cast<String, dynamic>();
+    return num.tryParse(wallet?['availableBalance']?.toString() ?? '') ?? 0;
   }
 
   void _goStep(int step) {
@@ -222,29 +238,33 @@ class _BoostScreenState extends State<BoostScreen>
                 opacity: _fadeAnim,
                 child: switch (_step) {
                   0 => _StepPickListing(
-                      future: _listingsFuture,
-                      onRetry: () =>
-                          setState(() => _listingsFuture = _loadListings()),
-                      selected: _selectedListing,
-                      onSelect: (listing) {
-                        setState(() => _selectedListing = listing);
-                        _goStep(1);
-                      },
-                    ),
+                    future: _listingsFuture,
+                    onRetry: () =>
+                        setState(() => _listingsFuture = _loadListings()),
+                    selected: _selectedListing,
+                    onSelect: (listing) {
+                      setState(() => _selectedListing = listing);
+                      _goStep(1);
+                    },
+                  ),
                   1 => _StepPickPlan(
-                      listing: _selectedListing!,
-                      selected: _selectedPlan,
-                      onSelect: (plan) {
-                        setState(() => _selectedPlan = plan);
-                        _goStep(2);
-                      },
-                    ),
+                    listing: _selectedListing!,
+                    selected: _selectedPlan,
+                    onSelect: (plan) {
+                      setState(() => _selectedPlan = plan);
+                      _goStep(2);
+                    },
+                  ),
                   _ => _StepReview(
-                      listing: _selectedListing!,
-                      plan: _selectedPlan!,
-                      isProcessing: _isProcessing,
-                      onConfirm: _confirmBoost,
-                    ),
+                    listing: _selectedListing!,
+                    plan: _selectedPlan!,
+                    isProcessing: _isProcessing,
+                    onConfirm: _confirmBoost,
+                    paymentMethod: _paymentMethod,
+                    onPaymentMethodChanged: (method) =>
+                        setState(() => _paymentMethod = method),
+                    walletBalanceFuture: _walletBalanceFuture,
+                  ),
                 },
               ),
             ),
@@ -310,7 +330,11 @@ class _AppBar extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.rocket_launch_rounded, color: _primaryColor, size: 14),
+                const Icon(
+                  Icons.rocket_launch_rounded,
+                  color: _primaryColor,
+                  size: 14,
+                ),
                 const SizedBox(width: 4),
                 const Text(
                   'Boost',
@@ -607,7 +631,11 @@ class _StepPickPlan extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(Icons.inventory_2_outlined, color: _primaryColor, size: 18),
+              const Icon(
+                Icons.inventory_2_outlined,
+                color: _primaryColor,
+                size: 18,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -644,7 +672,12 @@ class _StepPickPlan extends StatelessWidget {
         const SizedBox(height: 4),
         const Text(
           'Your listing will appear at the top of search results for the selected duration.',
-          style: TextStyle(fontSize: 13, color: _muted, fontWeight: FontWeight.w600, height: 1.4),
+          style: TextStyle(
+            fontSize: 13,
+            color: _muted,
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 16),
         ..._plans.map(
@@ -720,7 +753,10 @@ class _PlanCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         plan.label,
@@ -730,15 +766,17 @@ class _PlanCard extends StatelessWidget {
                           color: isSelected ? Colors.white : _ink,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? Colors.white.withValues(alpha: 0.22)
                               : isBestValue
-                                  ? Colors.orange.withValues(alpha: 0.12)
-                                  : Colors.grey.shade100,
+                              ? Colors.orange.withValues(alpha: 0.12)
+                              : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -749,8 +787,8 @@ class _PlanCard extends StatelessWidget {
                             color: isSelected
                                 ? Colors.white
                                 : isBestValue
-                                    ? Colors.orange
-                                    : _muted,
+                                ? Colors.orange
+                                : _muted,
                           ),
                         ),
                       ),
@@ -809,12 +847,18 @@ class _StepReview extends StatelessWidget {
     required this.plan,
     required this.isProcessing,
     required this.onConfirm,
+    required this.paymentMethod,
+    required this.onPaymentMethodChanged,
+    required this.walletBalanceFuture,
   });
 
   final _BoostListing listing;
   final _BoostPlan plan;
   final bool isProcessing;
   final VoidCallback onConfirm;
+  final String paymentMethod;
+  final ValueChanged<String> onPaymentMethodChanged;
+  final Future<num> walletBalanceFuture;
 
   String _formatNgn(int amount) {
     return '₦${amount.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',')}';
@@ -905,7 +949,10 @@ class _StepReview extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.08),
                         child: listing.imageUrl == null
                             ? const Icon(Icons.image_outlined, color: _muted)
-                            : Image.network(listing.imageUrl!, fit: BoxFit.cover),
+                            : Image.network(
+                                listing.imageUrl!,
+                                fit: BoxFit.cover,
+                              ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -955,7 +1002,10 @@ class _StepReview extends StatelessWidget {
           ...[
             (Icons.trending_up_rounded, 'Top placement in search results'),
             (Icons.visibility_rounded, 'Up to 10× more views'),
-            (Icons.notifications_active_outlined, 'Buyer alerts for your listing'),
+            (
+              Icons.notifications_active_outlined,
+              'Buyer alerts for your listing',
+            ),
             (Icons.verified_outlined, '"Boosted" badge on your item'),
           ].map(
             (item) => Padding(
@@ -1021,17 +1071,35 @@ class _StepReview extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _paymentOption(
-            icon: Icons.credit_card_rounded,
-            label: 'Card / Bank transfer',
-            subtitle: 'Pay securely with Paystack',
-            isSelected: true,
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Zidash Wallet',
+            subtitle: FutureBuilder<num>(
+              future: walletBalanceFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Text('Loading wallet balance...');
+                }
+                if (snapshot.hasError) {
+                  return const Text('Wallet balance unavailable');
+                }
+                return Text(
+                  'Available balance: ${_formatNgn((snapshot.data ?? 0).round())}',
+                );
+              },
+            ),
+            isSelected: paymentMethod == 'wallet',
+            onTap: () => onPaymentMethodChanged('wallet'),
           ),
           const SizedBox(height: 8),
           _paymentOption(
-            icon: Icons.account_balance_wallet_outlined,
-            label: 'Zidash Wallet',
-            subtitle: 'Use your in-app balance',
-            isSelected: false,
+            icon: Icons.account_balance_outlined,
+            label: 'Bank transfer',
+            subtitle: const Text('Transfer to the Zidash checkout account'),
+            isSelected: paymentMethod == 'bank_transfer',
+            onTap: () {
+              onPaymentMethodChanged('bank_transfer');
+              _showBankTransferSheet(context, total);
+            },
           ),
 
           const SizedBox(height: 32),
@@ -1043,7 +1111,11 @@ class _StepReview extends StatelessWidget {
               width: double.infinity,
               height: 56,
               child: FilledButton.icon(
-                onPressed: isProcessing ? null : onConfirm,
+                onPressed: isProcessing
+                    ? null
+                    : paymentMethod == 'bank_transfer'
+                    ? () => _showBankTransferSheet(context, total)
+                    : onConfirm,
                 icon: isProcessing
                     ? const SizedBox(
                         width: 18,
@@ -1055,7 +1127,11 @@ class _StepReview extends StatelessWidget {
                       )
                     : const Icon(Icons.lock_outline_rounded, size: 18),
                 label: Text(
-                  isProcessing ? 'Processing...' : 'Pay ${_formatNgn(total)}',
+                  isProcessing
+                      ? 'Processing...'
+                      : paymentMethod == 'bank_transfer'
+                      ? 'View bank details'
+                      : 'Pay ${_formatNgn(total)}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
@@ -1075,7 +1151,7 @@ class _StepReview extends StatelessWidget {
           const SizedBox(height: 8),
           Center(
             child: Text(
-              '🔒  Payments are secured by Paystack',
+              '🔒  Keep your payment reference for confirmation',
               style: TextStyle(
                 fontSize: 11,
                 color: Colors.grey.shade500,
@@ -1115,77 +1191,341 @@ class _StepReview extends StatelessWidget {
   Widget _paymentOption({
     required IconData icon,
     required String label,
-    required String subtitle,
+    required Widget subtitle,
     required bool isSelected,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isSelected ? _primaryColor : const Color(0xFFE9EDE9),
-          width: isSelected ? 1.5 : 1,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? _primaryColor : const Color(0xFFE9EDE9),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? _primaryColor.withValues(alpha: 0.1)
+                    : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? _primaryColor : _muted,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected ? _ink : _muted,
+                    ),
+                  ),
+                  DefaultTextStyle(
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: _muted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    child: subtitle,
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? _primaryColor : Colors.transparent,
+                border: Border.all(
+                  color: isSelected ? _primaryColor : Colors.grey.shade300,
+                  width: 2,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, size: 12, color: Colors.white)
+                  : null,
+            ),
+          ],
         ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? _primaryColor.withValues(alpha: 0.1)
-                  : Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              icon,
-              color: isSelected ? _primaryColor : _muted,
-              size: 20,
-            ),
+    );
+  }
+
+  Future<void> _showBankTransferSheet(BuildContext context, int total) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(10),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
           ),
-          const SizedBox(width: 12),
-          Expanded(
+          child: SingleChildScrollView(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: isSelected ? _ink : _muted,
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E3E0),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
                 ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Bank transfer',
+                        style: TextStyle(
+                          color: _ink,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
                 Text(
-                  subtitle,
+                  'Transfer ${_formatNgn(total)} to the account below.',
                   style: const TextStyle(
-                    fontSize: 11,
                     color: _muted,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: _surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE7E9E7)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'ACCOUNT NUMBER',
+                        style: TextStyle(
+                          color: _muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              '7066400165',
+                              style: TextStyle(
+                                color: _ink,
+                                fontSize: 25,
+                                letterSpacing: 1,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          IconButton.filledTonal(
+                            tooltip: 'Copy account number',
+                            onPressed: () async {
+                              await Clipboard.setData(
+                                const ClipboardData(text: '7066400165'),
+                              );
+                              if (!sheetContext.mounted) return;
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Account number copied'),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.copy_rounded),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 28),
+                      const _BankDetail(
+                        label: 'Bank name',
+                        value: 'Safehaven bank',
+                      ),
+                      const SizedBox(height: 12),
+                      const _BankDetail(
+                        label: 'Account name',
+                        value: 'Zidash checkout',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      _showPaymentPendingDialog(context);
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'I have made the transfer',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isSelected ? _primaryColor : Colors.transparent,
-              border: Border.all(
-                color: isSelected ? _primaryColor : Colors.grey.shade300,
-                width: 2,
-              ),
-            ),
-            child: isSelected
-                ? const Icon(Icons.check, size: 12, color: Colors.white)
-                : null,
-          ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Future<void> _showPaymentPendingDialog(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: _primaryColor.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.schedule_rounded,
+                  color: _primaryColor,
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Payment confirmation pending',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 21,
+                  height: 1.2,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Your promo will start automatically once your payment is confirmed.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _muted,
+                  fontSize: 14,
+                  height: 1.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BankDetail extends StatelessWidget {
+  const _BankDetail({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: _muted,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: _ink,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
   }
 }

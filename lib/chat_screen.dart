@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'product_detail_screen.dart';
+import 'seller_profile_screen.dart';
 import 'services/api_service.dart';
 
 const _primaryColor = Color(0xFF66C665);
@@ -126,6 +127,16 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  void _openSellerProfile() {
+    final sellerId = widget.sellerId?.trim();
+    if (sellerId == null || sellerId.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SellerProfileScreen(sellerId: sellerId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -137,38 +148,53 @@ class _ChatScreenState extends State<ChatScreen> {
           icon: const Icon(Icons.arrow_back, color: _ink),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: _surface,
-              backgroundImage: widget.avatarUrl == null
-                  ? null
-                  : NetworkImage(widget.avatarUrl!),
-              child: widget.avatarUrl == null
-                  ? Text(
-                      _initials(widget.title),
-                      style: const TextStyle(
-                        color: _primaryColor,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                widget.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: _ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
+        title: InkWell(
+          onTap: widget.sellerId?.trim().isNotEmpty == true
+              ? _openSellerProfile
+              : null,
+          borderRadius: BorderRadius.circular(24),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: _surface,
+                backgroundImage: widget.avatarUrl == null
+                    ? null
+                    : NetworkImage(widget.avatarUrl!),
+                child: widget.avatarUrl == null
+                    ? Text(
+                        _initials(widget.title),
+                        style: const TextStyle(
+                          color: _primaryColor,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (widget.sellerId?.trim().isNotEmpty == true)
+                const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: _muted,
+                    size: 20,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
       body: Column(
@@ -378,7 +404,7 @@ class _ChatScreenState extends State<ChatScreen> {
           SizedBox(width: 12),
           Expanded(
             child: Text(
-              'For your safety, keep conversations within the app. Never pay outside.',
+              'For your security, verify purchases, do not make payment to unverified merchants',
               style: TextStyle(
                 fontSize: 12,
                 color: _muted,

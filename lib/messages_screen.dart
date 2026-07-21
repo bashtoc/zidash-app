@@ -49,6 +49,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
           title: conversation.name,
           avatarUrl: conversation.avatarUrl,
           listing: conversation.listing,
+          sellerId: conversation.sellerId,
         ),
       ),
     );
@@ -298,6 +299,7 @@ class _ConversationPreview {
     this.avatarUrl,
     this.listingImageUrl,
     this.listing,
+    this.sellerId,
   });
 
   final String id;
@@ -309,9 +311,12 @@ class _ConversationPreview {
   final String? avatarUrl;
   final String? listingImageUrl;
   final Map<String, dynamic>? listing;
+  final String? sellerId;
 
   factory _ConversationPreview.fromJson(Map<String, dynamic> json) {
     final other = (json['otherUser'] as Map?)?.cast<String, dynamic>() ?? {};
+    final sellerProfile = (other['sellerProfile'] as Map?)
+        ?.cast<String, dynamic>();
     final listing = (json['listing'] as Map?)?.cast<String, dynamic>();
     final lastMessage = (json['lastMessage'] as Map?)?.cast<String, dynamic>();
     final name = _name(other);
@@ -330,6 +335,7 @@ class _ConversationPreview {
       timeLabel: _timeLabel(lastMessage?['createdAt'] ?? json['lastMessageAt']),
       listingImageUrl: _nullable(listingImage),
       listing: listing,
+      sellerId: _nullable(sellerProfile?['id']),
     );
   }
 
